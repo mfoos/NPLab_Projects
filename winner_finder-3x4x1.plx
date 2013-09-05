@@ -3,6 +3,8 @@
 use warnings;
 use strict;
 
+#The first program I ever wrote. One of these days, I'll make it a little more efficient.
+
 #unneeded unkn groups (shmir-on-shmir):04, 24, 25, 26, 27, 28, 29, 30, 31, 32
 
 my @file = (<>);
