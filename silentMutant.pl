@@ -11,15 +11,13 @@ my $inSeq = '';
 my $inStart = 0;
 my $inEnd = 0;
 my $inRest = '';
-my $limit = 0;
 my $usage = "\n\n$0 [Options] \n
 Options:
 
-	-seq	Protein coding sequence (frame 0, no more than 30bp)
+	-seq	Protein coding sequence (frame 0, at least 9bp/no more than 30bp)
 	-beg	Number of bp at beginning to retain identity (optional)
 	-end	Number of bp at end to retain identity (optional)
 	-rest	Restriction site to be added (use N for wildcards)(optional)
-	-limit	Maximum number of matches to return (if blank, all matches return)
 	-help	Show this message
 
 \n";
@@ -29,12 +27,11 @@ GetOptions(
 	'beg:i'	=>\$inStart,
 	'end:i'	=>\$inEnd,
 	'rest:s'=>\$inRest,
-	'limit:i'=>\$limit,
 	help	=>sub {pod2usage($usage);},
 ) or pod2usage(2);
 
-unless ($inSeq){
-	die "You must provide a protein coding sequence in frame 0.\n $usage";
+unless ($inSeq && ((length($inSeq)) >= 9)){
+	die "You must provide a protein coding sequence of at least 9nt in frame 0.\n $usage";
 }
 
 #define input
@@ -62,7 +59,7 @@ if ($seqLength%3){
 	else {
 		$codonCount = $seqLength/3;
 	}
-if ( $restSite && $origSeq =~ /$restSite/){
+if ($restSite && $origSeq =~ /$restSite/){
 	die "Your starting sequence already contains that restriction site\n";
 }
 
@@ -70,42 +67,48 @@ if ( $restSite && $origSeq =~ /$restSite/){
 my $codonTable = Bio::Tools::CodonTable->new();
 my $protein = $codonTable->translate($origSeq);
 
-#create an array reference of all of the codon possibilities for each protein
-my @seqFact;
+#create an array of array references of all of the codon possibilities for each amino acid
+my @seqFact; #will be the array of array refs
 for (my $i = 0; $i < $codonCount; $i++){
+	#for each amino acid in $protein, populate an array with reverse
+	#translation possibilities, then increment to move to next amino acid
 	my @codons = $codonTable->revtranslate(substr($protein,$i,1));
 	push @seqFact, [@codons];
 }
 
 print "Restriction site: $restSite\nStart: $keepStart\nEnd: $keepEnd\n";
-my $site = '';
+
+#Create an object to supply every possible codon combination from the reverse
+#translation
+my $crossProd = Set::CrossProduct->new(\@seqFact);
+my $totalNewSeqs = $crossProd->cardinality; 
+
+#Use the number of combinations possible to extract all of them from the object
+#generator, one at a time, with the get() method.
+my %uniqueSeq;
+my $newMut;
 my $switch = 0;
-my $max;
-my $iterator = Set::CrossProduct->new(\@seqFact);
-my $tuples = $iterator->cardinality();
-print "Possible non-unique codon combinations: $tuples\n";
-if ($limit){
-	$max = $limit;
-} else { $max = 60000; }
-print "Returning $max iterations\n";
-
-#create a series of strings up to $max choosing each codon at random from the array of codons which will code for the correct amino acid
-while ($switch <= $max){
-	my $newSeq;
-	my $pointMuts;
-	for (my $i = 0; $i < $codonCount; $i++){
-		my $index = scalar @{$seqFact[$i]};
-		$newSeq = $newSeq . $seqFact[$i][int(rand($index))];
-	}
-
+for (my $i = 0; $i < $totalNewSeqs; $i++){
+	my $newSeq; #
+	my $pointMuts; #
+	$newMut = $crossProd->get;
+	$newSeq = join('',@$newMut);
+		
 	#make sure all input criteria are met
 	$pointMuts = diffCountLast9nt($origSeq,$newSeq);
 	if ($pointMuts>=3 && $newSeq =~ /^$keepStart.*$keepEnd$/ && $newSeq =~ /($restSite)/){
 		my $restSiteUC = uc($1);
 		$newSeq =~ s/$restSite/$restSiteUC/;
 		print $newSeq,"\n";
-	}
 		$switch++;
+	}
+}
+#watch for the possibility that there are no matches
+if ($switch == 0){
+	print "There are no synonymous sequences meeting your criteria.\n";
+}
+else {
+	print "$switch matching sequences found.\n"
 }
 
 #return the number of differences between the last 9 nucleotides of the original sequence and the new one
@@ -120,5 +123,3 @@ sub diffCountLast9nt {
 	}
 	return $count;
 }
-
-
