@@ -5,12 +5,12 @@ use Getopt::Long;
 use Pod::Usage;
 
 my $dirName;
-my $excelOut = "SequenceResults.tsv";
+my $excelOut = "SequenceResults.txt";
 my $uptorrOut = "NumberedResults.txt";
 
 my $usage = "\n$0\n
 
--dir	Directory containing seq data
+-dir	Directory containing sequencing data
 -help	Show this message
 
 \n";
@@ -47,9 +47,11 @@ my @fileList = readdir(DIRHAND);
 #@natVals = @natVals[@index];
 #@fileList = @fileList[@index];
 
+# tab-separated values: Sample Name | Sequence
 unless (open(EXCELOUT,">","$dirName/$excelOut")) {
 	die "Cannot open file $excelOut for writing"
 }
+# A numbered list of sequences, ready to be query UP-TORR
 unless (open(UPTORROUT,">","$dirName/$uptorrOut")) {
 	die "Cannot open file $uptorrOut for writing"
 }
@@ -57,6 +59,7 @@ unless (open(UPTORROUT,">","$dirName/$uptorrOut")) {
 my $count = 0;
 foreach (@fileList) {
 	if ($_ =~ /seq$/) {
+		#only open ".seq" format files
 		my $eachSeq;
 		open(EACHSEQ,"<","$dirName/$_");
 		my $headerLine;
@@ -74,13 +77,16 @@ foreach (@fileList) {
 		my $seqID;
 		my $seq21;
 		if ($headerLine =~ />\d+-\d*_(.*)-/) {
-			#print ">$1\n"
+			# picks out the user-supplied sample ID from the weird automatic format
 			$seqID = $1;
 			$count++;
+			# for the numbered sequence output
 		}
 		if ($seqString =~ /CTAGCAGT(.*)TAGTTA/i) {
 			if (length($1) == 21) {
 				$seq21 = $1;
+				# you never know when the sequence will contain a TAGTTA
+				# or there will be Ns
 			}
 		}
 		else {
@@ -91,3 +97,6 @@ foreach (@fileList) {
 		close(EACHSEQ);
 	}	
 }
+
+close(EXCELOUT);
+close(UPTORROUT);
