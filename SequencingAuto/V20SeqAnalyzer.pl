@@ -82,13 +82,9 @@ foreach (@fileList) {
 			$count++;
 			# for the numbered sequence output
 		}
-		if ($seqString =~ /CTAGCAGT(.*)TAGTTA/i) {
-			if (length($1) == 21) {
-				$seq21 = $1;
-				# you never know when the sequence will contain a TAGTTA
-				# or there will be Ns
-			}
-		}
+		if ($seqString =~ /CTAGCAGT(.{21})TAGTTA/i) {
+			$seq21 = $1;
+		}	
 		else {
 			$seq21 = "This sequence requires people eyes"
 		}
